@@ -31,6 +31,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.SystemProperties;
+import android.util.DisplayMetrics;
 import android.os.SystemClock;
 import android.view.InputDevice;
 import android.view.KeyCharacterMap;
@@ -127,6 +128,25 @@ public class Utils {
         if (pm!= null) {
             pm.goToSleep(SystemClock.uptimeMillis());
         }
+    }
+
+	// Check if device has a notch
+    public static boolean hasNotch(Context context) {
+        int result = 0;
+        int resid;
+        int resourceId = context.getResources().getIdentifier(
+                "status_bar_height", "dimen", "android");
+        resid = context.getResources().getIdentifier("config_fillMainBuiltInDisplayCutout",
+                "bool", "android");
+        if (resid > 0) {
+            return context.getResources().getBoolean(resid);
+        }
+        if (resourceId > 0) {
+            result = context.getResources().getDimensionPixelSize(resourceId);
+        }
+        DisplayMetrics metrics = Resources.getSystem().getDisplayMetrics();
+        float px = 24 * (metrics.densityDpi / 160f);
+        return result > Math.round(px);
     }
 
     public static void sendKeycode(int keycode) {

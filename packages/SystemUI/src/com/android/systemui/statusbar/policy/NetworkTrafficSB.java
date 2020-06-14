@@ -13,7 +13,7 @@ import android.text.style.RelativeSizeSpan;
 import android.util.AttributeSet;
 import android.view.View;
 
-import com.android.internal.util.derp.derpUtils;
+import com.android.internal.util.weeb.Utils;
 
 import com.android.systemui.Dependency;
 import com.android.systemui.plugins.DarkIconDispatcher;
@@ -65,7 +65,7 @@ public class NetworkTrafficSB extends NetworkTraffic implements DarkReceiver, St
     @Override
     protected void setMode() {
         super.setMode();
-        boolean enabledInSbar = !derpUtils.hasNotch(mContext) &&
+        boolean enabledInSbar = !Utils.hasNotch(mContext) &&
                 Settings.System.getIntForUser(mContext.getContentResolver(),
                 Settings.System.NETWORK_TRAFFIC_STATE_SB, 0,
                 UserHandle.USER_CURRENT) == 1;

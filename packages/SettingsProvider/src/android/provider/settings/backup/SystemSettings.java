@@ -91,4 +91,5 @@ public class SystemSettings {
         Settings.System.LOCKSCREEN_MEDIA_ART,
         Settings.System.QS_SHOW_AUTO_BRIGHTNESS,
         Settings.System.QS_SHOW_BRIGHTNESS_ABOVE_FOOTER
+	};
 }

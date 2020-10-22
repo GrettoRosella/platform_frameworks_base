@@ -188,7 +188,6 @@ public class BinaryClockController implements ClockPlugin {
     public void onTimeTick() {
         mBinaryClock.onTimeChanged();
         mBigClockView.onTimeChanged();
-        mLockClock.refresh();
     }
 
     @Override

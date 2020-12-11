@@ -17,7 +17,6 @@
 package com.android.systemui.screenshot;
 
 import android.app.ActivityTaskManager;
-import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.content.ClipData;
@@ -78,11 +77,11 @@ class SaveImageInBackgroundTask extends AsyncTask<Void, Void, Void> {
     private static final String TAG = "SaveImageInBackgroundTask";
 
     private static final String SCREENSHOT_FILE_NAME_TEMPLATE = "Screenshot_%s.png";
-    private static final String SCREENSHOT_FILE_NAME_TEMPLATE_APPNAME = "Screenshot_%s_%s.png";
     private static final String SCREENSHOT_ID_TEMPLATE = "Screenshot_%s";
     private static final String SCREENSHOT_SHARE_SUBJECT_TEMPLATE = "Screenshot (%s)";
 
     private final Context mContext;
+    private final ScreenshotSmartActions mScreenshotSmartActions;
     private final GlobalScreenshot.SaveImageInBackgroundData mParams;
     private final GlobalScreenshot.SavedImageData mImageData;
     private final String mImageFileName;
@@ -92,24 +91,17 @@ class SaveImageInBackgroundTask extends AsyncTask<Void, Void, Void> {
     private final boolean mSmartActionsEnabled;
     private final Random mRandom = new Random();
 
-    SaveImageInBackgroundTask(Context context, GlobalScreenshot.SaveImageInBackgroundData data) {
+    SaveImageInBackgroundTask(Context context, ScreenshotSmartActions screenshotSmartActions,
+            GlobalScreenshot.SaveImageInBackgroundData data) {
         mContext = context;
+        mScreenshotSmartActions = screenshotSmartActions;
         mImageData = new GlobalScreenshot.SavedImageData();
 
         // Prepare all the output metadata
         mParams = data;
         mImageTime = System.currentTimeMillis();
         String imageDate = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date(mImageTime));
-        boolean onKeyguard = context.getSystemService(KeyguardManager.class).isKeyguardLocked();
-        if (!onKeyguard && data.appLabel != null) {
-            // Replace all spaces and special chars with an underscore
-            String appNameString = data.appLabel.toString().replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
-            mImageFileName = String.format(SCREENSHOT_FILE_NAME_TEMPLATE_APPNAME,
-                    imageDate, appNameString);
-        } else {
-            mImageFileName = String.format(SCREENSHOT_FILE_NAME_TEMPLATE, imageDate);
-        }
-
+        mImageFileName = String.format(SCREENSHOT_FILE_NAME_TEMPLATE, imageDate);
         mScreenshotId = String.format(SCREENSHOT_ID_TEMPLATE, UUID.randomUUID());
 
         // Initialize screenshot notification smart actions provider.
@@ -152,7 +144,7 @@ class SaveImageInBackgroundTask extends AsyncTask<Void, Void, Void> {
             final Uri uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
 
             CompletableFuture<List<Notification.Action>> smartActionsFuture =
-                    ScreenshotSmartActions.getSmartActionsFuture(
+                    mScreenshotSmartActions.getSmartActionsFuture(
                             mScreenshotId, uri, image, mSmartActionsProvider,
                             mSmartActionsEnabled, getUserHandle(mContext));
 
@@ -210,7 +202,7 @@ class SaveImageInBackgroundTask extends AsyncTask<Void, Void, Void> {
                         SystemUiDeviceConfigFlags.SCREENSHOT_NOTIFICATION_SMART_ACTIONS_TIMEOUT_MS,
                         1000);
                 smartActions.addAll(buildSmartActions(
-                        ScreenshotSmartActions.getSmartActions(
+                        mScreenshotSmartActions.getSmartActions(
                                 mScreenshotId, smartActionsFuture, timeoutMs,
                                 mSmartActionsProvider),
                         mContext));
@@ -285,11 +277,8 @@ class SaveImageInBackgroundTask extends AsyncTask<Void, Void, Void> {
         // by setting the (otherwise unused) request code to the current user id.
         int requestCode = context.getUserId();
 
-        PendingIntent chooserAction = PendingIntent.getBroadcast(context, requestCode,
-                new Intent(context, GlobalScreenshot.TargetChosenReceiver.class),
-                PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_ONE_SHOT);
         Intent sharingChooserIntent =
-                Intent.createChooser(sharingIntent, null, chooserAction.getIntentSender())
+                Intent.createChooser(sharingIntent, null)
                         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK)
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
@@ -299,7 +288,7 @@ class SaveImageInBackgroundTask extends AsyncTask<Void, Void, Void> {
 
         // Create a share action for the notification
         PendingIntent shareAction = PendingIntent.getBroadcastAsUser(context, requestCode,
-                new Intent(context, GlobalScreenshot.ActionProxyReceiver.class)
+                new Intent(context, ActionProxyReceiver.class)
                         .putExtra(GlobalScreenshot.EXTRA_ACTION_INTENT, pendingIntent)
                         .putExtra(GlobalScreenshot.EXTRA_DISALLOW_ENTER_PIP, true)
                         .putExtra(GlobalScreenshot.EXTRA_ID, mScreenshotId)
@@ -344,10 +333,8 @@ class SaveImageInBackgroundTask extends AsyncTask<Void, Void, Void> {
 
         // Create a edit action
         PendingIntent editAction = PendingIntent.getBroadcastAsUser(context, requestCode,
-                new Intent(context, GlobalScreenshot.ActionProxyReceiver.class)
+                new Intent(context, ActionProxyReceiver.class)
                         .putExtra(GlobalScreenshot.EXTRA_ACTION_INTENT, pendingIntent)
-                        .putExtra(GlobalScreenshot.EXTRA_CANCEL_NOTIFICATION,
-                                editIntent.getComponent() != null)
                         .putExtra(GlobalScreenshot.EXTRA_ID, mScreenshotId)
                         .putExtra(GlobalScreenshot.EXTRA_SMART_ACTIONS_ENABLED,
                                 mSmartActionsEnabled)
@@ -369,7 +356,7 @@ class SaveImageInBackgroundTask extends AsyncTask<Void, Void, Void> {
 
         // Create a delete action for the notification
         PendingIntent deleteAction = PendingIntent.getBroadcast(context, requestCode,
-                new Intent(context, GlobalScreenshot.DeleteScreenshotReceiver.class)
+                new Intent(context, DeleteScreenshotReceiver.class)
                         .putExtra(GlobalScreenshot.SCREENSHOT_URI_ID, uri.toString())
                         .putExtra(GlobalScreenshot.EXTRA_ID, mScreenshotId)
                         .putExtra(GlobalScreenshot.EXTRA_SMART_ACTIONS_ENABLED,
@@ -409,7 +396,7 @@ class SaveImageInBackgroundTask extends AsyncTask<Void, Void, Void> {
             String actionType = extras.getString(
                     ScreenshotNotificationSmartActionsProvider.ACTION_TYPE,
                     ScreenshotNotificationSmartActionsProvider.DEFAULT_ACTION_TYPE);
-            Intent intent = new Intent(context, GlobalScreenshot.SmartActionsReceiver.class)
+            Intent intent = new Intent(context, SmartActionsReceiver.class)
                     .putExtra(GlobalScreenshot.EXTRA_ACTION_INTENT, action.actionIntent)
                     .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
             addIntentExtras(mScreenshotId, intent, actionType, mSmartActionsEnabled);

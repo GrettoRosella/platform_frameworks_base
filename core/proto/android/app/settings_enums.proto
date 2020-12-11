@@ -2687,4 +2687,9 @@ enum PageId {
     // Custom Additions
     // Panel for Bluetooth
     PANEL_BLUETOOTH = 2001;
+
+    // OPEN: Settings > Network & internet > Adaptive connectivity
+    // CATEGORY: SETTINGS
+    // OS: R QPR
+    ADAPTIVE_CONNECTIVITY_CATEGORY = 1850;
 }
